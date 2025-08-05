@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { TabBar } from "@/components/TabBar";
-import { FriendCard } from "@/components/FriendCard";
-import { CreateRoomDialog } from "@/components/CreateRoomDialog";
-import { RoomCard } from "@/components/RoomCard";
+import TabBar from "@/components/TabBar";
+import FriendCard from "@/components/FriendCard";
+import CreateRoomDialog from "@/components/CreateRoomDialog";
+import RoomCard from "@/components/RoomCard";
 import { useAuth } from "@/hooks/useAuth";
 import { 
   MessageCircle, 
@@ -256,7 +256,6 @@ export default function HomePage() {
                           <RoomCard
                             key={room.id}
                             room={room}
-                            onJoin={() => handleJoinRoom(room.id)}
                           />
                         ))}
                       </div>
@@ -283,10 +282,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <CreateRoomDialog
-        open={isCreateRoomOpen}
-        onOpenChange={setIsCreateRoomOpen}
-      />
+      {isCreateRoomOpen && <CreateRoomDialog />}
     </div>
   );
 }
