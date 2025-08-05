@@ -203,6 +203,25 @@ export default function RoomChat() {
     }
   }, [userRooms, roomTabs.length]);
 
+  // Set up socket listeners for real-time messages
+  useEffect(() => {
+    if (!user) return;
+
+    const handleNewRoomMessage = (message: Message) => {
+      if (message.roomId === activeRoomId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/messages/room", activeRoomId] });
+      }
+    };
+
+    // Listen for new room messages
+    const { on, off } = useSocket();
+    on('new-room-message', handleNewRoomMessage);
+
+    return () => {
+      off('new-room-message', handleNewRoomMessage);
+    };
+  }, [activeRoomId, user, queryClient]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -232,6 +251,10 @@ export default function RoomChat() {
   };
 
   const handleCloseRoom = (roomId: string) => {
+    // Emit socket leave event with user data
+    if (user) {
+      leaveRoom(roomId, user.id);
+    }
     leaveRoomMutation.mutate(roomId);
   };
 
@@ -271,7 +294,7 @@ export default function RoomChat() {
     return (
       <div className="min-h-screen pb-16">
         {/* Header */}
-        <div className="gradient-bg p-4 pt-12">
+        <div className="gradient-bg p-3 pt-8">
           <div className="flex items-center space-x-3">
             <Button 
               variant="ghost" 
@@ -327,7 +350,7 @@ export default function RoomChat() {
     <div className="min-h-screen pb-16 flex flex-col">
       {/* Header */}
       <div className="gradient-bg flex-shrink-0">
-        <div className="flex items-center justify-between p-4 pt-12">
+        <div className="flex items-center justify-between p-3 pt-8">
           <div className="flex items-center space-x-3">
             <Button 
               variant="ghost" 
@@ -385,7 +408,7 @@ export default function RoomChat() {
         </div>
 
         {/* Room tabs navigation */}
-        <div className="flex justify-center space-x-2 pb-4">
+        <div className="flex justify-center space-x-2 pb-2">
           <ScrollArea className="max-w-xs">
             <div className="flex space-x-2">
               {roomTabs.map((tab) => (

@@ -214,6 +214,15 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(chatRooms.createdAt));
   }
 
+  async getChatRoomById(roomId: string): Promise<ChatRoom | null> {
+    const [room] = await db
+      .select()
+      .from(chatRooms)
+      .where(eq(chatRooms.id, roomId))
+      .limit(1);
+    return room || null;
+  }
+
   async getUserRooms(userId: string): Promise<ChatRoom[]> {
     return await db
       .select({
@@ -454,6 +463,7 @@ export const storage = {
   getRoomMessages: (roomId: string) => dbStorage.getRoomMessages(roomId),
   sendMessage: (message: InsertMessage) => dbStorage.sendMessage(message),
   getChatRooms: () => dbStorage.getChatRooms(),
+  getChatRoomById: (roomId: string) => dbStorage.getChatRoomById(roomId),
   getUserRooms: (userId: string) => dbStorage.getUserRooms(userId),
   createChatRoom: (room: InsertChatRoom) => dbStorage.createChatRoom(room),
   joinRoom: (userId: string, roomId: string) => dbStorage.joinRoom(userId, roomId),

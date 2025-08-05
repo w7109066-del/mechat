@@ -238,15 +238,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const member = await storage.joinRoom(userId, roomId);
 
-      // Get user info and send join notification
+      // Get user info and room info for join notification
       const user = await storage.getUser(userId);
-      if (user) {
+      const room = await storage.getChatRoomById(roomId);
+      if (user && room) {
         const joinMessage = {
           senderId: 'system',
           roomId: roomId,
-          content: `${user.username || user.email.split('@')[0]} has entered`,
+          content: `${room.name}: ${user.username || user.email.split('@')[0]} has entered`,
           messageType: 'system'
         };
+
+        // Store the system message
+        await storage.sendMessage(joinMessage);
 
         // Broadcast join message to room
         io.to(`room-${roomId}`).emit('new-room-message', joinMessage);
@@ -265,20 +269,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { roomId } = req.params;
 
-      // Get user info before leaving
+      // Get user info and room info before leaving
       const user = await storage.getUser(userId);
-      
+      const room = await storage.getChatRoomById(roomId);
+
       // Remove user from room
       await storage.leaveRoom(userId, roomId);
 
       // Send leave notification
-      if (user) {
+      if (user && room) {
         const leaveMessage = {
           senderId: 'system',
           roomId: roomId,
-          content: `${user.username || user.email.split('@')[0]} has left`,
+          content: `${room.name}: ${user.username || user.email.split('@')[0]} has left`,
           messageType: 'system'
         };
+
+        // Store the system message
+        await storage.sendMessage(leaveMessage);
 
         // Broadcast leave message to room
         io.to(`room-${roomId}`).emit('new-room-message', leaveMessage);
@@ -528,15 +536,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         socket.leave(`room-${data.roomId}`);
         console.log(`User ${data.userId} left room: ${data.roomId}`);
 
-        // Get user info and send leave notification
+        // Get user info and room info before leaving
         const user = await storage.getUser(data.userId);
-        if (user) {
+        const room = await storage.getChatRoomById(data.roomId);
+
+        // Remove user from room
+        await storage.leaveRoom(data.userId, data.roomId);
+
+        // Send leave notification
+        if (user && room) {
           const leaveMessage = {
             senderId: 'system',
             roomId: data.roomId,
-            content: `${user.username || user.email.split('@')[0]} has left`,
+            content: `${room.name}: ${user.username || user.email.split('@')[0]} has left`,
             messageType: 'system'
           };
+
+          // Store the system message
+          await storage.sendMessage(leaveMessage);
 
           // Broadcast leave message to room
           io.to(`room-${data.roomId}`).emit('new-room-message', leaveMessage);

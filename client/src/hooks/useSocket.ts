@@ -47,9 +47,13 @@ export function useSocket() {
   };
 
   // Leave chat room
-  const leaveRoom = (roomId: string) => {
+  const leaveRoom = (roomId: string, userId?: string) => {
     if (socketRef.current) {
-      socketRef.current.emit('leave-room', roomId);
+      if (userId) {
+        socketRef.current.emit('leave-room', { userId, roomId });
+      } else {
+        socketRef.current.emit('leave-room', roomId);
+      }
     }
   };
 
