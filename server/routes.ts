@@ -7,11 +7,29 @@ import { fromZodError } from "zod-validation-error";
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
+  // Authentication middleware
+  const requireAuth = (req: any, res: any, next: any) => {
+    if (!req.user || !req.user.claims || !req.user.claims.sub) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    next();
+  };
+
   // Auth routes
   app.get('/api/auth/user', async (req: any, res) => {
     try {
+      // Check if user is authenticated
+      if (!req.user || !req.user.claims || !req.user.claims.sub) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -20,7 +38,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User routes
-  app.put('/api/user/status', async (req: any, res) => {
+  app.put('/api/user/status', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { isOnline, status } = req.body;
@@ -34,7 +52,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Friend routes
-  app.get('/api/friends', async (req: any, res) => {
+  app.get('/api/friends', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const friends = await storage.getFriends(userId);
@@ -45,7 +63,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/friends/:friendId', async (req: any, res) => {
+  app.post('/api/friends/:friendId', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { friendId } = req.params;
@@ -58,7 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/friend-requests', async (req: any, res) => {
+  app.get('/api/friend-requests', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const requests = await storage.getFriendRequests(userId);
@@ -69,7 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/friend-requests/:requestId/accept', async (req: any, res) => {
+  app.put('/api/friend-requests/:requestId/accept', requireAuth, async (req: any, res) => {
     try {
       const { requestId } = req.params;
       const friendship = await storage.acceptFriendRequest(requestId);
@@ -81,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Message routes
-  app.get('/api/messages/direct/:friendId', async (req: any, res) => {
+  app.get('/api/messages/direct/:friendId', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { friendId } = req.params;
@@ -105,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/messages', async (req: any, res) => {
+  app.post('/api/messages', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const messageData = { ...req.body, senderId: userId };
@@ -137,7 +155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/rooms/user', async (req: any, res) => {
+  app.get('/api/rooms/user', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const rooms = await storage.getUserRooms(userId);
@@ -148,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/rooms', async (req: any, res) => {
+  app.post('/api/rooms', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const roomData = { 
@@ -173,7 +191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/rooms/:roomId/join', async (req: any, res) => {
+  app.post('/api/rooms/:roomId/join', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { roomId } = req.params;
@@ -208,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/posts", async (req: any, res) => {
+  app.post("/api/posts", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { content, mediaUrl, mediaType, videoDuration } = req.body;
@@ -232,7 +250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/posts/:postId/like", async (req: any, res) => {
+  app.post("/api/posts/:postId/like", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { postId } = req.params;
@@ -244,7 +262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/posts/:postId/like", async (req: any, res) => {
+  app.delete("/api/posts/:postId/like", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { postId } = req.params;
@@ -267,7 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/posts/:postId/comments", async (req: any, res) => {
+  app.post("/api/posts/:postId/comments", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { postId } = req.params;
@@ -284,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/posts/:postId/share", async (req: any, res) => {
+  app.post("/api/posts/:postId/share", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { postId } = req.params;
