@@ -1,36 +1,49 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { useAuth } from "@/hooks/useAuth";
-import NotFound from "@/pages/not-found";
-import Welcome from "@/pages/welcome";
-import Home from "@/pages/home";
-import Chat from "@/pages/chat";
-import Rooms from "@/pages/rooms";
-import RoomChat from "@/pages/room-chat";
-import Settings from "@/pages/settings";
-import Feed from "@/pages/feed";
 
-function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+import { Switch, Route, BrowserRouter } from "wouter";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient";
+import { Toaster } from "@/components/ui/toaster";
+import { useAuth } from "./hooks/useAuth";
+import { useSocket } from "./hooks/useSocket";
+
+// Pages
+import WelcomePage from "./pages/welcome";
+import HomePage from "./pages/home";
+import ChatPage from "./pages/chat";
+import RoomChatPage from "./pages/room-chat";
+import RoomsPage from "./pages/rooms";
+import FeedPage from "./pages/feed";
+import SettingsPage from "./pages/settings";
+import NotFoundPage from "./pages/not-found";
+
+function AppContent() {
+  const { user, isLoading } = useAuth();
+  useSocket(user?.id);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <WelcomePage />;
+  }
 
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Welcome} />
-      ) : (
-        <>
-          <Route path="/" component={Home} />
-          <Route path="/chat/:friendId" component={Chat} />
-          <Route path="/rooms" component={Rooms} />
-          <Route path="/room-chat" component={RoomChat} />
-          <Route path="/feed" component={Feed} />
-          <Route path="/settings" component={Settings} />
-        </>
-      )}
-      <Route component={NotFound} />
+      <Route path="/" component={HomePage} />
+      <Route path="/chat/:friendId" component={ChatPage} />
+      <Route path="/rooms" component={RoomsPage} />
+      <Route path="/room/:roomId" component={RoomChatPage} />
+      <Route path="/feed" component={FeedPage} />
+      <Route path="/settings" component={SettingsPage} />
+      <Route component={NotFoundPage} />
     </Switch>
   );
 }
@@ -38,12 +51,10 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <div className="min-h-screen bg-gray-100">
-          <Router />
-        </div>
+      <BrowserRouter>
+        <AppContent />
         <Toaster />
-      </TooltipProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 }

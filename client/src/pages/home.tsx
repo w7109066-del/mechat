@@ -1,221 +1,292 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
-import { isUnauthorizedError } from "@/lib/authUtils";
-import { apiRequest } from "@/lib/queryClient";
+
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Search, ToggleLeft, ToggleRight, Image, Smile } from "lucide-react";
-import TabBar from "@/components/TabBar";
-import FriendCard from "@/components/FriendCard";
-import type { User } from "@shared/schema";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { TabBar } from "@/components/TabBar";
+import { FriendCard } from "@/components/FriendCard";
+import { CreateRoomDialog } from "@/components/CreateRoomDialog";
+import { RoomCard } from "@/components/RoomCard";
+import { useAuth } from "@/hooks/useAuth";
+import { 
+  MessageCircle, 
+  Users, 
+  Hash, 
+  Settings, 
+  UserPlus,
+  Home as HomeIcon,
+  Rss
+} from "lucide-react";
 
-export default function Home() {
-  const { user, isAuthenticated, isLoading } = useAuth();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [statusInput, setStatusInput] = useState("");
-  const [isOnline, setIsOnline] = useState(true);
+interface Friend {
+  id: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl?: string;
+  isOnline: boolean;
+  status?: string;
+}
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
+interface ChatRoom {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  isPrivate: boolean;
+  createdBy: string;
+  createdAt: string;
+}
+
+export default function HomePage() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
+  const [activeTab, setActiveTab] = useState<"friends" | "rooms">("friends");
+  const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
 
   // Fetch friends
-  const { data: friends = [], isLoading: friendsLoading } = useQuery<User[]>({
+  const { data: friends = [] } = useQuery<Friend[]>({
     queryKey: ["/api/friends"],
-    enabled: isAuthenticated,
-    retry: false,
+    enabled: !!user,
   });
 
-  // Update user status mutation
-  const updateStatusMutation = useMutation({
-    mutationFn: async (data: { isOnline: boolean; status?: string }) => {
-      await apiRequest("PUT", "/api/user/status", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      if (statusInput.trim()) {
-        toast({
-          title: "Status Updated",
-          description: "Your status has been updated successfully.",
-        });
-        setStatusInput("");
-      }
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to update status. Please try again.",
-        variant: "destructive",
-      });
-    },
+  // Fetch chat rooms
+  const { data: rooms = [] } = useQuery<ChatRoom[]>({
+    queryKey: ["/api/rooms"],
+    enabled: !!user,
   });
 
-  const handleStatusUpdate = () => {
-    if (statusInput.trim()) {
-      updateStatusMutation.mutate({ isOnline, status: statusInput.trim() });
-    }
+  // Fetch user's joined rooms
+  const { data: userRooms = [] } = useQuery<ChatRoom[]>({
+    queryKey: ["/api/rooms/user"],
+    enabled: !!user,
+  });
+
+  const onlineFriends = friends.filter(friend => friend.isOnline);
+  const offlineFriends = friends.filter(friend => !friend.isOnline);
+
+  const handleChatWithFriend = (friendId: string) => {
+    navigate(`/chat/${friendId}`);
   };
 
-  const toggleOnlineStatus = () => {
-    const newOnlineStatus = !isOnline;
-    setIsOnline(newOnlineStatus);
-    updateStatusMutation.mutate({ isOnline: newOnlineStatus });
+  const handleJoinRoom = (roomId: string) => {
+    navigate(`/room/${roomId}`);
   };
 
-  if (isLoading) {
+  const navigation = [
+    { id: "home", label: "Home", icon: HomeIcon, active: true, onClick: () => navigate("/") },
+    { id: "feed", label: "Feed", icon: Rss, active: false, onClick: () => navigate("/feed") },
+    { id: "rooms", label: "Rooms", icon: Hash, active: false, onClick: () => navigate("/rooms") },
+    { id: "settings", label: "Settings", icon: Settings, active: false, onClick: () => navigate("/settings") },
+  ];
+
+  if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[hsl(196,100%,50%)]"></div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Please log in to continue</p>
+        </div>
       </div>
     );
   }
 
-  if (!isAuthenticated || !user) {
-    return null;
-  }
-
-  const displayName = user?.username || user?.firstName || user?.email || "User";
-  const userLevel = user?.level || 1;
-
   return (
-    <div className="min-h-screen pb-16">
-      {/* Header */}
-      <div className="gradient-bg p-4 pt-12">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="container mx-auto px-4 py-6 max-w-6xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">Welcome back, {user.firstName}!</h1>
+            <p className="text-gray-600 mt-1">Connect with friends and join conversations</p>
+          </div>
           <div className="flex items-center space-x-3">
-            <Avatar className="w-12 h-12 border-2 border-white" data-testid="img-avatar">
-              <AvatarImage 
-                src={user?.profileImageUrl || undefined} 
-                alt={displayName}
-              />
-              <AvatarFallback className="bg-white text-[hsl(196,100%,50%)] font-semibold">
-                {displayName.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h2 className="text-white font-semibold" data-testid="text-username">{displayName}</h2>
-              <div className="flex items-center space-x-2">
-                <span className="text-white text-sm opacity-90" data-testid="text-level">Level {userLevel}</span>
-                <div className="flex items-center space-x-1">
-                  <div className={isOnline ? "status-dot-online" : "status-dot-offline"}></div>
-                  <span className="text-white text-xs" data-testid="status-online">
-                    {isOnline ? "Online" : "Offline"}
-                  </span>
+            <Badge variant={user.isOnline ? "default" : "secondary"} className="px-3 py-1">
+              {user.isOnline ? "Online" : "Offline"}
+            </Badge>
+            <Button variant="outline" size="sm" onClick={() => navigate("/settings")}>
+              <Settings className="w-4 h-4 mr-2" />
+              Settings
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Navigation */}
+          <div className="lg:col-span-1">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <HomeIcon className="w-5 h-5 mr-2" />
+                  Navigation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {navigation.map((item) => (
+                  <Button
+                    key={item.id}
+                    variant={item.active ? "default" : "ghost"}
+                    className="w-full justify-start"
+                    onClick={item.onClick}
+                  >
+                    <item.icon className="w-4 h-4 mr-2" />
+                    {item.label}
+                  </Button>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Quick Stats */}
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle>Quick Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Friends Online</span>
+                  <Badge variant="default">{onlineFriends.length}</Badge>
                 </div>
-              </div>
-            </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Total Friends</span>
+                  <Badge variant="secondary">{friends.length}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Joined Rooms</span>
+                  <Badge variant="secondary">{userRooms.length}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Available Rooms</span>
+                  <Badge variant="secondary">{rooms.length}</Badge>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="icon" className="text-white" data-testid="button-search">
-              <Search className="w-6 h-6" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-white" 
-              onClick={toggleOnlineStatus}
-              data-testid="button-toggle-status"
-            >
-              {isOnline ? (
-                <ToggleRight className="w-6 h-6" />
-              ) : (
-                <ToggleLeft className="w-6 h-6" />
-              )}
-            </Button>
-          </div>
-        </div>
 
-        {/* Status Update */}
-        <div className="mt-4">
-          <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-xl p-3">
-            <Input
-              type="text"
-              placeholder="What's on your mind?"
-              value={statusInput}
-              onChange={(e) => setStatusInput(e.target.value)}
-              className="w-full bg-transparent text-white placeholder-white placeholder-opacity-70 border-none outline-none focus:ring-0"
-              data-testid="input-status"
-            />
-            <div className="flex justify-between items-center mt-2">
-              <div className="flex space-x-3">
-                <Button variant="ghost" size="icon" className="text-white opacity-70" data-testid="button-image">
-                  <Image className="w-5 h-5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="text-white opacity-70" data-testid="button-emoji">
-                  <Smile className="w-5 h-5" />
-                </Button>
-              </div>
-              <Button 
-                onClick={handleStatusUpdate}
-                disabled={!statusInput.trim() || updateStatusMutation.isPending}
-                className="bg-[hsl(186,100%,50%)] hover:bg-[hsl(186,100%,45%)] text-white px-4 py-1 rounded-full text-sm"
-                data-testid="button-post"
-              >
-                Post
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+          {/* Main Content */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center">
+                    <MessageCircle className="w-5 h-5 mr-2" />
+                    Connect & Chat
+                  </CardTitle>
+                  <TabBar
+                    tabs={[
+                      { id: "friends", label: "Friends", icon: Users },
+                      { id: "rooms", label: "Rooms", icon: Hash },
+                    ]}
+                    activeTab={activeTab}
+                    onTabChange={(tab) => setActiveTab(tab as "friends" | "rooms")}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                {activeTab === "friends" && (
+                  <div className="space-y-6">
+                    {onlineFriends.length > 0 && (
+                      <div>
+                        <div className="flex items-center mb-3">
+                          <h3 className="font-semibold text-green-600">Online Friends</h3>
+                          <Badge variant="default" className="ml-2">{onlineFriends.length}</Badge>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {onlineFriends.map((friend) => (
+                            <FriendCard
+                              key={friend.id}
+                              friend={friend}
+                              onChat={() => handleChatWithFriend(friend.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-      {/* Friends List */}
-      <div className="p-4">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4" data-testid="text-friends-title">Friends</h3>
-        
-        {friendsLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-xl p-4 shadow-sm animate-pulse">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gray-300 rounded-full"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-300 rounded w-24 mb-2"></div>
-                    <div className="h-3 bg-gray-300 rounded w-16"></div>
+                    {onlineFriends.length > 0 && offlineFriends.length > 0 && (
+                      <Separator />
+                    )}
+
+                    {offlineFriends.length > 0 && (
+                      <div>
+                        <div className="flex items-center mb-3">
+                          <h3 className="font-semibold text-gray-600">Offline Friends</h3>
+                          <Badge variant="secondary" className="ml-2">{offlineFriends.length}</Badge>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {offlineFriends.map((friend) => (
+                            <FriendCard
+                              key={friend.id}
+                              friend={friend}
+                              onChat={() => handleChatWithFriend(friend.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {friends.length === 0 && (
+                      <div className="text-center py-12">
+                        <UserPlus className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="font-semibold text-gray-600 mb-2">No friends yet</h3>
+                        <p className="text-gray-500 mb-4">Start connecting with people to see them here</p>
+                        <Button onClick={() => navigate("/rooms")}>
+                          <Hash className="w-4 h-4 mr-2" />
+                          Join a Room
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
-            ))}
+                )}
+
+                {activeTab === "rooms" && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold">Available Rooms</h3>
+                      <Button onClick={() => setIsCreateRoomOpen(true)} size="sm">
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Create Room
+                      </Button>
+                    </div>
+
+                    {rooms.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {rooms.slice(0, 6).map((room) => (
+                          <RoomCard
+                            key={room.id}
+                            room={room}
+                            onJoin={() => handleJoinRoom(room.id)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <Hash className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="font-semibold text-gray-600 mb-2">No rooms available</h3>
+                        <p className="text-gray-500 mb-4">Be the first to create a room</p>
+                      </div>
+                    )}
+
+                    {rooms.length > 6 && (
+                      <div className="text-center">
+                        <Button variant="outline" onClick={() => navigate("/rooms")}>
+                          View All Rooms ({rooms.length})
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        ) : friends.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-500" data-testid="text-no-friends">No friends yet. Start connecting!</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {friends.map((friend: User) => (
-              <FriendCard key={friend.id} friend={friend} />
-            ))}
-          </div>
-        )}
+        </div>
       </div>
 
-      <TabBar activeTab="home" />
+      <CreateRoomDialog
+        open={isCreateRoomOpen}
+        onOpenChange={setIsCreateRoomOpen}
+      />
     </div>
   );
 }

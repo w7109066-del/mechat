@@ -52,26 +52,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/auth/user', async (req: any, res) => {
     try {
       const userId = 'demo-user';
-      let user = await storage.getUser(userId);
       
-      // If user doesn't exist, create them using upsertUser
-      if (!user) {
-        const defaultUser = {
-          id: userId,
-          username: 'DemoUser',
-          email: 'demo@example.com',
-          firstName: 'Demo',
-          lastName: 'User',
-          profileImageUrl: null,
-          level: 1,
-          isOnline: true,
-          status: null,
-          country: null,
-          gender: null
-        };
-        user = await storage.upsertUser(defaultUser);
-      }
+      // Always use upsert to handle both create and update scenarios
+      const defaultUser = {
+        id: userId,
+        username: 'DemoUser',
+        email: 'demo@example.com',
+        firstName: 'Demo',
+        lastName: 'User',
+        profileImageUrl: null,
+        level: 1,
+        isOnline: true,
+        status: null,
+        country: null,
+        gender: null
+      };
       
+      const user = await storage.upsertUser(defaultUser);
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
