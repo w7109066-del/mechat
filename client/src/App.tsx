@@ -40,6 +40,7 @@ function AppContent() {
       <Route path="/" component={HomePage} />
       <Route path="/chat/:friendId" component={ChatPage} />
       <Route path="/rooms" component={RoomsPage} />
+      <Route path="/room-chat" component={RoomChatPage} />
       <Route path="/room/:roomId" component={RoomChatPage} />
       <Route path="/feed" component={FeedPage} />
       <Route path="/settings" component={SettingsPage} />
