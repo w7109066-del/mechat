@@ -25,7 +25,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/signup', async (req, res) => {
     try {
       const { username, email, firstName, lastName } = req.body;
-      
+
       if (!username || !email) {
         return res.status(400).json({ message: "Username and email are required" });
       }
@@ -52,7 +52,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/auth/user', async (req: any, res) => {
     try {
       const userId = 'demo-user';
-      
+
       // Always use upsert to handle both create and update scenarios
       const defaultUser = {
         id: userId,
@@ -67,7 +67,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         country: null,
         gender: null
       };
-      
+
       const user = await storage.upsertUser(defaultUser);
       res.json(user);
     } catch (error) {
@@ -81,7 +81,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { isOnline, status } = req.body;
-      
+
       const user = await storage.updateUserStatus(userId, isOnline, status);
       res.json(user);
     } catch (error) {
@@ -106,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { friendId } = req.params;
-      
+
       const friendship = await storage.addFriend(userId, friendId);
       res.json(friendship);
     } catch (error) {
@@ -142,7 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { friendId } = req.params;
-      
+
       const messages = await storage.getDirectMessages(userId, friendId);
       res.json(messages);
     } catch (error) {
@@ -166,15 +166,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const messageData = { ...req.body, senderId: userId };
-      
+
       const result = insertMessageSchema.safeParse(messageData);
       if (!result.success) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Invalid message data",
           error: fromZodError(result.error).toString()
         });
       }
-      
+
       const message = await storage.sendMessage(result.data);
       res.json(message);
     } catch (error) {
@@ -208,20 +208,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/rooms', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const roomData = { 
-        ...req.body, 
+      const roomData = {
+        ...req.body,
         createdBy: userId,
         category: req.body.category || "OFFICIAL ROOM"
       };
-      
+
       const result = insertChatRoomSchema.safeParse(roomData);
       if (!result.success) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Invalid room data",
           error: fromZodError(result.error).toString()
         });
       }
-      
+
       const room = await storage.createChatRoom(result.data);
       res.json(room);
     } catch (error) {
@@ -230,12 +230,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Join chat room
   app.post('/api/rooms/:roomId/join', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { roomId } = req.params;
-      
+
       const member = await storage.joinRoom(userId, roomId);
+
+      // Get user info and send join notification
+      const user = await storage.getUser(userId);
+      if (user) {
+        const joinMessage = {
+          senderId: 'system',
+          roomId: roomId,
+          content: `${user.username || user.email.split('@')[0]} has entered`,
+          messageType: 'system'
+        };
+
+        // Broadcast join message to room
+        io.to(`room-${roomId}`).emit('new-room-message', joinMessage);
+      }
+
       res.json(member);
     } catch (error) {
       console.error("Error joining room:", error);
@@ -269,12 +285,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { content, mediaUrl, mediaType, videoDuration } = req.body;
-      
+
       // Validate video duration
       if (mediaType === 'video' && videoDuration > 16) {
         return res.status(400).json({ message: "Video duration cannot exceed 16 seconds" });
       }
-      
+
       const post = await storage.createPost({
         userId,
         content,
@@ -354,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
-  
+
   // Setup Socket.IO
   const io = new SocketIOServer(httpServer, {
     cors: {
@@ -405,7 +421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const result = insertMessageSchema.safeParse(messageData);
         if (result.success) {
           const message = await storage.sendMessage(result.data);
-          
+
           // Send to both sender and receiver
           io.to(`user-${data.senderId}`).emit('new-direct-message', message);
           io.to(`user-${data.receiverId}`).emit('new-direct-message', message);
@@ -436,7 +452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const result = insertMessageSchema.safeParse(messageData);
         if (result.success) {
           const message = await storage.sendMessage(result.data);
-          
+
           // Broadcast to all users in the room
           io.to(`room-${data.roomId}`).emit('new-room-message', message);
         }
@@ -471,6 +487,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         socket.broadcast.emit('user-status-updated', data);
       } catch (error) {
         console.error('Error updating user status:', error);
+      }
+    });
+
+    // Handle user leaving a room
+    socket.on('leave-room', async (data: { userId: string; roomId: string }) => {
+      try {
+        socket.leave(`room-${data.roomId}`);
+        console.log(`User ${data.userId} left room: ${data.roomId}`);
+
+        // Get user info and send leave notification
+        const user = await storage.getUser(data.userId);
+        if (user) {
+          const leaveMessage = {
+            senderId: 'system',
+            roomId: data.roomId,
+            content: `${user.username || user.email.split('@')[0]} has left`,
+            messageType: 'system'
+          };
+
+          // Broadcast leave message to room
+          io.to(`room-${data.roomId}`).emit('new-room-message', leaveMessage);
+        }
+      } catch (error) {
+        console.error('Error handling user leave room:', error);
       }
     });
 

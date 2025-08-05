@@ -181,7 +181,7 @@ export default function RoomChat() {
   const closeRoomTab = (roomId: string) => {
     const updatedTabs = roomTabs.filter(tab => tab.id !== roomId);
     setRoomTabs(updatedTabs);
-    
+
     if (activeRoomId === roomId) {
       const newActiveTab = updatedTabs[updatedTabs.length - 1];
       setActiveRoomId(newActiveTab?.id || "");
@@ -228,7 +228,7 @@ export default function RoomChat() {
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => window.history.back()}
+              onClick={() => window.location.href = '/rooms'}
               className="text-white hover:bg-white/20"
               data-testid="button-back"
             >
@@ -284,7 +284,7 @@ export default function RoomChat() {
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => window.history.back()}
+              onClick={() => window.location.href = '/rooms'}
               className="text-white hover:bg-white/20"
               data-testid="button-back"
             >
@@ -297,7 +297,7 @@ export default function RoomChat() {
               <p className="text-white/70 text-sm">Chatroom</p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-copy">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -360,10 +360,16 @@ export default function RoomChat() {
               });
               const showTime = index === 0 || 
                 new Date(messages[index - 1].createdAt).getTime() - new Date(message.createdAt).getTime() > 300000;
-              
+
+              // System message handling
+              const isSystemMessage = message.senderId === 'system'; // Assuming 'system' is the senderId for system messages
+              const senderName = isSystemMessage 
+                ? "System" 
+                : sender.username || sender.email.split('@')[0];
+
               return (
                 <div key={message.id} className="text-sm">
-                  {showTime && (
+                  {showTime && !isSystemMessage && ( // Only show time for non-system messages
                     <div className="text-center text-gray-400 text-xs my-2">
                       {timestamp}
                     </div>
@@ -371,6 +377,7 @@ export default function RoomChat() {
                   <div className="flex items-start space-x-2">
                     <span 
                       className={`font-semibold text-sm ${
+                        isSystemMessage ? 'text-gray-500 italic' : // Style for system messages
                         message.senderId === user.id ? 'text-blue-600' : 
                         sender.username === 'bass' ? 'text-gray-800' :
                         sender.username === 'tumi' ? 'text-red-500' :
@@ -382,7 +389,7 @@ export default function RoomChat() {
                         'text-gray-600'
                       }`}
                     >
-                      {sender.username || sender.email.split('@')[0]}
+                      {senderName}
                     </span>
                     <span className="text-gray-600 flex-1">{message.content}</span>
                   </div>

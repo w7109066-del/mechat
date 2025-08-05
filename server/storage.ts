@@ -244,6 +244,15 @@ export class DatabaseStorage implements IStorage {
     return newRoom;
   }
 
+  async getUser(userId: string): Promise<User | null> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return user || null;
+  }
+
   async joinRoom(userId: string, roomId: string): Promise<RoomMember> {
     const [member] = await db
       .insert(roomMembers)
@@ -253,6 +262,17 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return member;
+  }
+
+  async leaveRoom(userId: string, roomId: string): Promise<void> {
+    await db
+      .delete(roomMembers)
+      .where(
+        and(
+          eq(roomMembers.userId, userId),
+          eq(roomMembers.roomId, roomId)
+        )
+      );
   }
 
   async getRoomMembers(roomId: string): Promise<User[]> {
