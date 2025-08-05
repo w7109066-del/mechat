@@ -277,104 +277,116 @@ export default function RoomChat() {
 
   return (
     <div className="min-h-screen pb-16 flex flex-col">
-      {/* Header with Room Tabs */}
+      {/* Header */}
       <div className="gradient-bg flex-shrink-0">
-        <div className="flex items-center p-4 pt-12">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => window.history.back()}
-            className="text-white hover:bg-white/20 mr-3"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </Button>
-          <div className="flex items-center">
-            <Hash className="w-5 h-5 text-white mr-2" />
-            <h1 className="text-white text-lg font-semibold" data-testid="text-active-room-name">
-              {activeRoom?.name || "Room Chat"}
-            </h1>
+        <div className="flex items-center justify-between p-4 pt-12">
+          <div className="flex items-center space-x-3">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => window.history.back()}
+              className="text-white hover:bg-white/20"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </Button>
+            <div>
+              <h1 className="text-white text-lg font-semibold" data-testid="text-active-room-name">
+                {activeRoom?.name || "Chatroom"}
+              </h1>
+              <p className="text-white/70 text-sm">Chatroom</p>
+            </div>
           </div>
-          <div className="ml-auto flex items-center space-x-2">
-            <Badge variant="secondary" className="bg-white/20 text-white" data-testid="text-member-count">
-              {roomMembers.length} members
-            </Badge>
-            <Button variant="ghost" size="icon" className="text-white" data-testid="button-room-settings">
-              <Settings className="w-5 h-5" />
+          
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-copy">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 012 2v2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              </svg>
+            </Button>
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-gift">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+              </svg>
+            </Button>
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-member-list">
+              <Users className="w-5 h-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-menu">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              </svg>
             </Button>
           </div>
         </div>
 
-        {/* Room Tabs */}
-        <div className="px-4 pb-2">
-          <div className="flex space-x-2 overflow-x-auto">
-            {roomTabs.map((tab) => (
-              <div
-                key={tab.id}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg min-w-0 flex-shrink-0 ${
-                  tab.id === activeRoomId
-                    ? "bg-white/20 text-white"
-                    : "bg-white/10 text-white/70 hover:bg-white/15"
-                }`}
-                data-testid={`tab-room-${tab.id}`}
-              >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => switchToRoom(tab.id)}
-                  className="p-0 h-auto text-inherit hover:text-inherit"
-                  data-testid={`button-switch-room-${tab.id}`}
-                >
-                  <Hash className="w-4 h-4 mr-1" />
-                  <span className="truncate max-w-24">{tab.room.name}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => closeRoomTab(tab.id)}
-                  className="p-0 h-auto w-4 text-inherit hover:text-inherit"
-                  data-testid={`button-close-room-${tab.id}`}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              </div>
-            ))}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white/70 hover:text-white px-2 py-2 min-w-0 flex-shrink-0"
-              data-testid="button-add-room-tab"
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
-          </div>
+        {/* Room indicator dots */}
+        <div className="flex justify-center space-x-2 pb-4">
+          {roomTabs.map((tab, index) => (
+            <div
+              key={tab.id}
+              className={`w-2 h-2 rounded-full ${
+                tab.id === activeRoomId ? "bg-white" : "bg-white/30"
+              }`}
+              data-testid={`room-indicator-${tab.id}`}
+            />
+          ))}
         </div>
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+      <div className="flex-1 p-4 space-y-2 overflow-y-auto bg-white">
         {messagesLoading ? (
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[hsl(196,100%,50%)]"></div>
           </div>
         ) : messages.length === 0 ? (
           <div className="text-center py-8">
-            <Hash className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500" data-testid="text-no-room-messages">
-              Welcome to #{activeRoom?.name}! Start the conversation.
+            <p className="text-gray-500 text-sm" data-testid="text-no-room-messages">
+              Welcome to {activeRoom?.name} official chat room.
+            </p>
+            <p className="text-gray-400 text-xs mt-2">
+              Currently in the room: {roomMembers.map(member => member.username || member.email.split('@')[0]).join(', ')}
             </p>
           </div>
         ) : (
           <>
-            {messages.map((message: Message) => {
+            {messages.map((message: Message, index: number) => {
               const sender = roomMembers.find((member: User) => member.id === message.senderId) || user;
+              const timestamp = new Date(message.createdAt).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+              });
+              const showTime = index === 0 || 
+                new Date(messages[index - 1].createdAt).getTime() - new Date(message.createdAt).getTime() > 300000;
+              
               return (
-                <MessageBubble 
-                  key={message.id} 
-                  message={message} 
-                  isOwn={message.senderId === user.id}
-                  sender={sender}
-                />
+                <div key={message.id} className="text-sm">
+                  {showTime && (
+                    <div className="text-center text-gray-400 text-xs my-2">
+                      {timestamp}
+                    </div>
+                  )}
+                  <div className="flex items-start space-x-2">
+                    <span 
+                      className={`font-semibold text-sm ${
+                        message.senderId === user.id ? 'text-blue-600' : 
+                        sender.username === 'bass' ? 'text-gray-800' :
+                        sender.username === 'tumi' ? 'text-red-500' :
+                        sender.username === 'batik' ? 'text-blue-500' :
+                        sender.username === 'send' ? 'text-orange-500' :
+                        sender.username === 'huang' ? 'text-green-600' :
+                        sender.username === 'alif' ? 'text-purple-600' :
+                        sender.username === 'nickie' ? 'text-pink-500' :
+                        'text-gray-600'
+                      }`}
+                    >
+                      {sender.username || sender.email.split('@')[0]}
+                    </span>
+                    <span className="text-gray-600 flex-1">{message.content}</span>
+                  </div>
+                </div>
               );
             })}
             <div ref={messagesEndRef} />
@@ -385,27 +397,24 @@ export default function RoomChat() {
       {/* Message Input */}
       <div className="p-4 bg-white border-t border-gray-200 flex-shrink-0">
         <div className="flex items-center space-x-3">
-          <Button variant="ghost" size="icon" className="text-[hsl(196,100%,50%)]" data-testid="button-add-attachment">
-            <Plus className="w-6 h-6" />
+          <Button variant="ghost" size="icon" className="text-gray-400" data-testid="button-emoji-room">
+            <Smile className="w-6 h-6" />
           </Button>
-          <div className="flex-1 bg-gray-100 rounded-full px-4 py-2 flex items-center space-x-2">
+          <div className="flex-1 bg-gray-100 rounded-full px-4 py-3 flex items-center space-x-2">
             <Input
               type="text"
-              placeholder={`Message #${activeRoom?.name || "room"}`}
+              placeholder="Type a message"
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              className="flex-1 bg-transparent border-none outline-none focus:ring-0 p-0"
+              className="flex-1 bg-transparent border-none outline-none focus:ring-0 p-0 text-gray-700 placeholder:text-gray-500"
               data-testid="input-room-message"
             />
-            <Button variant="ghost" size="icon" className="text-gray-400" data-testid="button-emoji-room">
-              <Smile className="w-5 h-5" />
-            </Button>
           </div>
           <Button 
             onClick={handleSendMessage}
             disabled={!messageInput.trim() || sendMessageMutation.isPending}
-            className="gradient-bg text-white p-2 rounded-full hover:scale-105 transition-transform"
+            className="gradient-bg text-white p-3 rounded-full hover:scale-105 transition-transform"
             data-testid="button-send-room-message"
           >
             <Send className="w-5 h-5" />
