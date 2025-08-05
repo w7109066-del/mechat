@@ -6,21 +6,16 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Replit Auth middleware
+// Demo Auth middleware
 app.use((req: any, res, next) => {
-  const userId = req.headers['x-replit-user-id'];
-  const userName = req.headers['x-replit-user-name'];
-  const userRoles = req.headers['x-replit-user-roles'];
-  
-  if (userId) {
-    req.user = {
-      claims: {
-        sub: userId,
-        name: userName,
-        roles: userRoles
-      }
-    };
-  }
+  // Set demo user for all requests
+  req.user = {
+    claims: {
+      sub: 'demo-user',
+      name: 'DemoUser',
+      roles: 'user'
+    }
+  };
   
   next();
 });

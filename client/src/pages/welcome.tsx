@@ -21,13 +21,13 @@ export default function Welcome() {
   });
 
   const handleLogin = () => {
-    // Redirect to Replit Auth
-    window.location.href = '/api/login';
+    // Redirect to home page
+    window.location.href = '/';
   };
 
   const handleSignup = () => {
-    // Redirect to Replit Auth (signup flow)
-    window.location.href = '/api/login';
+    // Redirect to home page
+    window.location.href = '/';
   };
 
   if (currentScreen === 'welcome') {

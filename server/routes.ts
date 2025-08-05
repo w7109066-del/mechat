@@ -17,8 +17,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth routes
   app.get('/api/login', (req, res) => {
-    // Redirect to Replit's authentication
-    res.redirect('https://replit.com/auth/complete');
+    // Redirect to home page
+    res.redirect('/');
   });
 
   app.post('/api/signup', async (req, res) => {
@@ -50,28 +50,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/auth/user', async (req: any, res) => {
     try {
-      // Check if user is authenticated
-      if (!req.user || !req.user.claims || !req.user.claims.sub) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      // For demo purposes, create a default user
+      const defaultUser = {
+        id: 'demo-user',
+        username: 'DemoUser',
+        email: 'demo@example.com',
+        firstName: 'Demo',
+        lastName: 'User',
+        profileImageUrl: null,
+        level: 1,
+        isOnline: true,
+        status: null,
+        country: null,
+        gender: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
       
-      const userId = req.user.claims.sub;
-      const userName = req.user.claims.name;
-      let user = await storage.getUser(userId);
+      let user = await storage.getUser('demo-user');
       
-      // If user doesn't exist, create them automatically
-      if (!user && userName) {
-        user = await storage.createUser({
-          username: userName,
-          email: `${userName}@replit.com`, // Default email format
-          firstName: userName,
-          level: 1,
-          isOnline: true
-        });
-      }
-      
+      // If user doesn't exist, create them
       if (!user) {
-        return res.status(404).json({ message: "User not found" });
+        user = await storage.createUser(defaultUser);
       }
       
       res.json(user);
