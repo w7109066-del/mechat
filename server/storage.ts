@@ -28,7 +28,6 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, sql } from "drizzle-orm";
-import { Server, Socket } from "socket.io";
 import crypto from "crypto";
 
 // Interface for storage operations
@@ -438,71 +437,3 @@ export const storage = {
   sharePost: (userId: string, postId: string) => dbStorage.sharePost(userId, postId),
 };
 
-// Socket.IO integration
-const io = new Server(3000, {
-  cors: {
-    origin: "*", // Allow all origins for simplicity, adjust for production
-  },
-});
-
-io.on("connection", (socket: Socket) => {
-  console.log("a user connected:", socket.id);
-
-  // Handle user status updates
-  socket.on("update_status", async (data: { userId: string; isOnline: boolean; status?: string }) => {
-    try {
-      const updatedUser = await storage.updateUserStatus(data.userId, data.isOnline, data.status);
-      // Broadcast the status update to all connected clients
-      io.emit("user_status_updated", updatedUser);
-      console.log(`User ${data.userId} status updated to ${data.isOnline ? 'online' : 'offline'} with status: ${data.status}`);
-    } catch (error) {
-      console.error("Error updating user status:", error);
-    }
-  });
-
-  // Handle sending direct messages
-  socket.on("send_message", async (message: InsertMessage) => {
-    try {
-      const sentMessage = await storage.sendMessage(message);
-      // Emit the message to the recipient and sender
-      io.to(message.recipientId).emit("receive_message", sentMessage);
-      socket.emit("message_sent_confirmation", sentMessage); // Confirmation to sender
-      console.log(`Message sent from ${message.senderId} to ${message.recipientId}`);
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
-  });
-
-  // Handle joining chat rooms
-  socket.on("join_room", async (data: { userId: string; roomId: string }) => {
-    try {
-      await storage.joinRoom(data.userId, data.roomId);
-      socket.join(data.roomId);
-      console.log(`User ${data.userId} joined room ${data.roomId}`);
-      // Optionally, broadcast to the room that a new user joined
-      io.to(data.roomId).emit("user_joined_room", { userId: data.userId, roomId: data.roomId });
-    } catch (error) {
-      console.error(`Error joining room ${data.roomId} for user ${data.userId}:`, error);
-    }
-  });
-
-  // Handle sending messages in chat rooms
-  socket.on("send_room_message", async (message: InsertMessage) => {
-    try {
-      const sentMessage = await storage.sendMessage(message);
-      // Emit the message to everyone in the room
-      io.to(message.roomId!).emit("receive_room_message", sentMessage);
-      console.log(`Message sent in room ${message.roomId} from ${message.senderId}`);
-    } catch (error) {
-      console.error("Error sending room message:", error);
-    }
-  });
-
-  // Handle user disconnection
-  socket.on("disconnect", () => {
-    console.log("user disconnected:", socket.id);
-    // You might want to update user status to offline here if you have a way to map socket.id to userId
-  });
-});
-
-console.log("Socket.IO server started on port 3000");
