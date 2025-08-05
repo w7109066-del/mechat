@@ -54,9 +54,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = 'demo-user';
       let user = await storage.getUser(userId);
       
-      // If user doesn't exist, create them
+      // If user doesn't exist, create them using upsertUser
       if (!user) {
         const defaultUser = {
+          id: userId,
           username: 'DemoUser',
           email: 'demo@example.com',
           firstName: 'Demo',
@@ -68,7 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           country: null,
           gender: null
         };
-        user = await storage.createUser(defaultUser);
+        user = await storage.upsertUser(defaultUser);
       }
       
       res.json(user);
