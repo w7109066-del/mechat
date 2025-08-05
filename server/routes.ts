@@ -259,6 +259,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Leave chat room
+  app.post('/api/rooms/:roomId/leave', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { roomId } = req.params;
+
+      // Get user info before leaving
+      const user = await storage.getUser(userId);
+      
+      // Remove user from room
+      await storage.leaveRoom(userId, roomId);
+
+      // Send leave notification
+      if (user) {
+        const leaveMessage = {
+          senderId: 'system',
+          roomId: roomId,
+          content: `${user.username || user.email.split('@')[0]} has left`,
+          messageType: 'system'
+        };
+
+        // Broadcast leave message to room
+        io.to(`room-${roomId}`).emit('new-room-message', leaveMessage);
+      }
+
+      res.json({ message: "Successfully left room" });
+    } catch (error) {
+      console.error("Error leaving room:", error);
+      res.status(500).json({ message: "Failed to leave room" });
+    }
+  });
+
   app.get('/api/rooms/:roomId/members', async (req: any, res) => {
     try {
       const { roomId } = req.params;

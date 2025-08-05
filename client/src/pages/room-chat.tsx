@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
+import { useSocket } from "@/hooks/useSocket";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -19,7 +20,10 @@ import {
   X,
   Settings,
   UserPlus,
-  Hash
+  Hash,
+  ChevronDown,
+  ChevronUp,
+  LogOut
 } from "lucide-react";
 import MessageBubble from "@/components/MessageBubble";
 import TabBar from "@/components/TabBar";
@@ -35,9 +39,11 @@ export default function RoomChat() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { leaveRoom } = useSocket();
   const [messageInput, setMessageInput] = useState("");
   const [roomTabs, setRoomTabs] = useState<RoomTab[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string>("");
+  const [showUserList, setShowUserList] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Redirect to login if not authenticated
@@ -147,6 +153,43 @@ export default function RoomChat() {
     },
   });
 
+  // Leave room mutation
+  const leaveRoomMutation = useMutation({
+    mutationFn: async (roomId: string) => {
+      await apiRequest("POST", `/api/rooms/${roomId}/leave`);
+    },
+    onSuccess: (_, roomId) => {
+      // Disconnect from socket room
+      leaveRoom(roomId);
+      // Remove from local state
+      closeRoomTab(roomId);
+      // Refresh user rooms
+      queryClient.invalidateQueries({ queryKey: ["/api/rooms/user"] });
+      toast({
+        title: "Left room",
+        description: "You have left the room successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to leave room. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Initialize with user's rooms
   useEffect(() => {
     if (userRooms.length > 0 && roomTabs.length === 0) {
@@ -188,8 +231,13 @@ export default function RoomChat() {
     }
   };
 
+  const handleCloseRoom = (roomId: string) => {
+    leaveRoomMutation.mutate(roomId);
+  };
+
   const switchToRoom = (roomId: string) => {
     setActiveRoomId(roomId);
+    setShowUserList(false); // Close user list when switching rooms
   };
 
   const handleSendMessage = () => {
@@ -309,8 +357,24 @@ export default function RoomChat() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
               </svg>
             </Button>
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-member-list">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-white hover:bg-white/20" 
+              onClick={() => setShowUserList(!showUserList)}
+              data-testid="button-toggle-member-list"
+            >
               <Users className="w-5 h-5" />
+              {showUserList ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-white hover:bg-white/20"
+              onClick={() => handleCloseRoom(activeRoomId)}
+              data-testid="button-close-room"
+            >
+              <LogOut className="w-5 h-5" />
             </Button>
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-menu">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,19 +384,70 @@ export default function RoomChat() {
           </div>
         </div>
 
-        {/* Room indicator dots */}
+        {/* Room tabs navigation */}
         <div className="flex justify-center space-x-2 pb-4">
-          {roomTabs.map((tab, index) => (
-            <div
-              key={tab.id}
-              className={`w-2 h-2 rounded-full ${
-                tab.id === activeRoomId ? "bg-white" : "bg-white/30"
-              }`}
-              data-testid={`room-indicator-${tab.id}`}
-            />
-          ))}
+          <ScrollArea className="max-w-xs">
+            <div className="flex space-x-2">
+              {roomTabs.map((tab) => (
+                <div key={tab.id} className="flex items-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => switchToRoom(tab.id)}
+                    className={`text-white hover:bg-white/20 text-xs px-2 py-1 ${
+                      tab.id === activeRoomId ? "bg-white/20" : ""
+                    }`}
+                    data-testid={`room-tab-${tab.id}`}
+                  >
+                    <Hash className="w-3 h-3 mr-1" />
+                    {tab.room.name}
+                  </Button>
+                  {roomTabs.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCloseRoom(tab.id)}
+                      className="text-white hover:bg-white/20 p-1 ml-1"
+                      data-testid={`close-room-tab-${tab.id}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
       </div>
+
+      {/* User List (collapsible) */}
+      {showUserList && (
+        <div className="bg-gray-50 border-b border-gray-200 p-3">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">
+            Room Members ({roomMembers.length})
+          </h3>
+          <ScrollArea className="max-h-32">
+            <div className="grid grid-cols-2 gap-2">
+              {roomMembers.map((member: User) => (
+                <div key={member.id} className="flex items-center space-x-2 text-xs">
+                  <Avatar className="w-6 h-6">
+                    <AvatarImage src={member.profileImageUrl || ""} />
+                    <AvatarFallback className="text-xs">
+                      {(member.username || member.email.split('@')[0]).charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-gray-700 truncate">
+                    {member.username || member.email.split('@')[0]}
+                  </span>
+                  {member.isOnline && (
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
 
       {/* Chat Messages */}
       <div className="flex-1 p-4 space-y-2 overflow-y-auto bg-white">

@@ -53,6 +53,7 @@ export interface IStorage {
   getUserRooms(userId: string): Promise<ChatRoom[]>;
   createChatRoom(room: InsertChatRoom): Promise<ChatRoom>;
   joinRoom(userId: string, roomId: string): Promise<RoomMember>;
+  leaveRoom(userId: string, roomId: string): Promise<void>;
   getRoomMembers(roomId: string): Promise<User[]>;
 
   // Post operations
@@ -456,6 +457,7 @@ export const storage = {
   getUserRooms: (userId: string) => dbStorage.getUserRooms(userId),
   createChatRoom: (room: InsertChatRoom) => dbStorage.createChatRoom(room),
   joinRoom: (userId: string, roomId: string) => dbStorage.joinRoom(userId, roomId),
+  leaveRoom: (userId: string, roomId: string) => dbStorage.leaveRoom(userId, roomId),
   getRoomMembers: (roomId: string) => dbStorage.getRoomMembers(roomId),
   getPosts: () => dbStorage.getPosts(),
   getPostsByUser: (userId: string) => dbStorage.getPostsByUser(userId),
