@@ -6,6 +6,25 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Replit Auth middleware
+app.use((req: any, res, next) => {
+  const userId = req.headers['x-replit-user-id'];
+  const userName = req.headers['x-replit-user-name'];
+  const userRoles = req.headers['x-replit-user-roles'];
+  
+  if (userId) {
+    req.user = {
+      claims: {
+        sub: userId,
+        name: userName,
+        roles: userRoles
+      }
+    };
+  }
+  
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
