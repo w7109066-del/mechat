@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { Server as SocketIOServer } from "socket.io";
 import { storage } from "./storage";
 
 import { insertMessageSchema, insertChatRoomSchema } from "@shared/schema";
@@ -50,27 +51,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/auth/user', async (req: any, res) => {
     try {
-      // For demo purposes, create a default user
-      const defaultUser = {
-        id: 'demo-user',
-        username: 'DemoUser',
-        email: 'demo@example.com',
-        firstName: 'Demo',
-        lastName: 'User',
-        profileImageUrl: null,
-        level: 1,
-        isOnline: true,
-        status: null,
-        country: null,
-        gender: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      let user = await storage.getUser('demo-user');
+      const userId = 'demo-user';
+      let user = await storage.getUser(userId);
       
       // If user doesn't exist, create them
       if (!user) {
+        const defaultUser = {
+          username: 'DemoUser',
+          email: 'demo@example.com',
+          firstName: 'Demo',
+          lastName: 'User',
+          profileImageUrl: null,
+          level: 1,
+          isOnline: true,
+          status: null,
+          country: null,
+          gender: null
+        };
         user = await storage.createUser(defaultUser);
       }
       
@@ -359,5 +356,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  
+  // Setup Socket.IO
+  const io = new SocketIOServer(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+
+  // Socket.IO connection handling
+  io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
+
+    // Join user to their personal room for notifications
+    socket.on('join-user-room', (userId: string) => {
+      socket.join(`user-${userId}`);
+      console.log(`User ${userId} joined their personal room`);
+    });
+
+    // Join chat room
+    socket.on('join-room', (roomId: string) => {
+      socket.join(`room-${roomId}`);
+      console.log(`User joined room: ${roomId}`);
+    });
+
+    // Leave chat room
+    socket.on('leave-room', (roomId: string) => {
+      socket.leave(`room-${roomId}`);
+      console.log(`User left room: ${roomId}`);
+    });
+
+    // Handle direct message
+    socket.on('send-direct-message', async (data: {
+      senderId: string;
+      receiverId: string;
+      content: string;
+      mediaUrl?: string;
+      mediaType?: string;
+    }) => {
+      try {
+        const messageData = {
+          senderId: data.senderId,
+          receiverId: data.receiverId,
+          content: data.content,
+          mediaUrl: data.mediaUrl,
+          mediaType: data.mediaType
+        };
+
+        const result = insertMessageSchema.safeParse(messageData);
+        if (result.success) {
+          const message = await storage.sendMessage(result.data);
+          
+          // Send to both sender and receiver
+          io.to(`user-${data.senderId}`).emit('new-direct-message', message);
+          io.to(`user-${data.receiverId}`).emit('new-direct-message', message);
+        }
+      } catch (error) {
+        console.error('Error sending direct message:', error);
+        socket.emit('message-error', { error: 'Failed to send message' });
+      }
+    });
+
+    // Handle room message
+    socket.on('send-room-message', async (data: {
+      senderId: string;
+      roomId: string;
+      content: string;
+      mediaUrl?: string;
+      mediaType?: string;
+    }) => {
+      try {
+        const messageData = {
+          senderId: data.senderId,
+          roomId: data.roomId,
+          content: data.content,
+          mediaUrl: data.mediaUrl,
+          mediaType: data.mediaType
+        };
+
+        const result = insertMessageSchema.safeParse(messageData);
+        if (result.success) {
+          const message = await storage.sendMessage(result.data);
+          
+          // Broadcast to all users in the room
+          io.to(`room-${data.roomId}`).emit('new-room-message', message);
+        }
+      } catch (error) {
+        console.error('Error sending room message:', error);
+        socket.emit('message-error', { error: 'Failed to send message' });
+      }
+    });
+
+    // Handle typing indicators
+    socket.on('typing-start', (data: { userId: string; roomId?: string; receiverId?: string }) => {
+      if (data.roomId) {
+        socket.to(`room-${data.roomId}`).emit('user-typing', { userId: data.userId, roomId: data.roomId });
+      } else if (data.receiverId) {
+        socket.to(`user-${data.receiverId}`).emit('user-typing', { userId: data.userId });
+      }
+    });
+
+    socket.on('typing-stop', (data: { userId: string; roomId?: string; receiverId?: string }) => {
+      if (data.roomId) {
+        socket.to(`room-${data.roomId}`).emit('user-stopped-typing', { userId: data.userId, roomId: data.roomId });
+      } else if (data.receiverId) {
+        socket.to(`user-${data.receiverId}`).emit('user-stopped-typing', { userId: data.userId });
+      }
+    });
+
+    // Handle user status updates
+    socket.on('update-status', async (data: { userId: string; isOnline: boolean; status?: string }) => {
+      try {
+        await storage.updateUserStatus(data.userId, data.isOnline, data.status);
+        // Broadcast status update to all friends
+        socket.broadcast.emit('user-status-updated', data);
+      } catch (error) {
+        console.error('Error updating user status:', error);
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log('User disconnected:', socket.id);
+    });
+  });
+
   return httpServer;
 }
