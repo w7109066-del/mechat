@@ -35,25 +35,25 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserStatus(userId: string, isOnline: boolean, status?: string): Promise<User>;
-  
+
   // Friend operations
   getFriends(userId: string): Promise<User[]>;
   addFriend(userId: string, friendId: string): Promise<Friendship>;
   getFriendRequests(userId: string): Promise<Friendship[]>;
   acceptFriendRequest(friendshipId: string): Promise<Friendship>;
-  
+
   // Message operations
   getDirectMessages(userId: string, friendId: string): Promise<Message[]>;
   getRoomMessages(roomId: string): Promise<Message[]>;
   sendMessage(message: InsertMessage): Promise<Message>;
-  
+
   // Room operations
   getChatRooms(): Promise<ChatRoom[]>;
   getUserRooms(userId: string): Promise<ChatRoom[]>;
   createChatRoom(room: InsertChatRoom): Promise<ChatRoom>;
   joinRoom(userId: string, roomId: string): Promise<RoomMember>;
   getRoomMembers(roomId: string): Promise<User[]>;
-  
+
   // Post operations
   getPosts(): Promise<(Post & { user: User; likesCount: number; commentsCount: number; sharesCount: number; isLiked: boolean })[]>;
   getPostsByUser(userId: string): Promise<Post[]>;
@@ -92,7 +92,7 @@ export class DatabaseStorage implements IStorage {
     if (status !== undefined) {
       updateData.status = status;
     }
-    
+
     const [user] = await db
       .update(users)
       .set(updateData)
@@ -125,7 +125,7 @@ export class DatabaseStorage implements IStorage {
         eq(friendships.userId, userId),
         eq(friendships.status, "accepted")
       ));
-    
+
     return friends;
   }
 
@@ -223,13 +223,13 @@ export class DatabaseStorage implements IStorage {
       .insert(chatRooms)
       .values(room)
       .returning();
-    
+
     // Add creator as member
     await db.insert(roomMembers).values({
       roomId: newRoom.id,
       userId: room.createdBy,
     });
-    
+
     return newRoom;
   }
 
@@ -387,4 +387,31 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = {
+  async createUser(userData: {
+    username: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    profileImageUrl?: string | null;
+    level?: number;
+    isOnline?: boolean;
+    status?: string | null;
+  }) {
+    const [user] = await db.insert(users).values({
+      id: userData.username, // Use username as ID for Replit integration
+      username: userData.username,
+      email: userData.email,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      profileImageUrl: userData.profileImageUrl,
+      level: userData.level || 1,
+      isOnline: userData.isOnline || true,
+      status: userData.status,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return user;
+  },
+  getUser,
+};

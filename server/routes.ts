@@ -16,6 +16,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Auth routes
+  app.get('/api/login', (req, res) => {
+    // Redirect to Replit's authentication
+    res.redirect('https://replit.com/auth/complete');
+  });
+
+  app.post('/api/signup', async (req, res) => {
+    try {
+      const { username, email, firstName, lastName } = req.body;
+      
+      if (!username || !email) {
+        return res.status(400).json({ message: "Username and email are required" });
+      }
+
+      // Create user in database
+      const user = await storage.createUser({
+        username,
+        email,
+        firstName,
+        lastName,
+        profileImageUrl: null,
+        level: 1,
+        isOnline: true,
+        status: null
+      });
+
+      res.json(user);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
   app.get('/api/auth/user', async (req: any, res) => {
     try {
       // Check if user is authenticated
@@ -24,7 +56,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const userName = req.user.claims.name;
+      let user = await storage.getUser(userId);
+      
+      // If user doesn't exist, create them automatically
+      if (!user && userName) {
+        user = await storage.createUser({
+          username: userName,
+          email: `${userName}@replit.com`, // Default email format
+          firstName: userName,
+          level: 1,
+          isOnline: true
+        });
+      }
       
       if (!user) {
         return res.status(404).json({ message: "User not found" });
