@@ -387,6 +387,9 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
+// Create storage instance
+const dbStorage = new DatabaseStorage();
+
 export const storage = {
   async createUser(userData: {
     username: string;
@@ -413,5 +416,29 @@ export const storage = {
     }).returning();
     return user;
   },
-  getUser,
+  
+  // Delegate to DatabaseStorage methods
+  getUser: (id: string) => dbStorage.getUser(id),
+  upsertUser: (user: UpsertUser) => dbStorage.upsertUser(user),
+  updateUserStatus: (userId: string, isOnline: boolean, status?: string) => dbStorage.updateUserStatus(userId, isOnline, status),
+  getFriends: (userId: string) => dbStorage.getFriends(userId),
+  addFriend: (userId: string, friendId: string) => dbStorage.addFriend(userId, friendId),
+  getFriendRequests: (userId: string) => dbStorage.getFriendRequests(userId),
+  acceptFriendRequest: (friendshipId: string) => dbStorage.acceptFriendRequest(friendshipId),
+  getDirectMessages: (userId: string, friendId: string) => dbStorage.getDirectMessages(userId, friendId),
+  getRoomMessages: (roomId: string) => dbStorage.getRoomMessages(roomId),
+  sendMessage: (message: InsertMessage) => dbStorage.sendMessage(message),
+  getChatRooms: () => dbStorage.getChatRooms(),
+  getUserRooms: (userId: string) => dbStorage.getUserRooms(userId),
+  createChatRoom: (room: InsertChatRoom) => dbStorage.createChatRoom(room),
+  joinRoom: (userId: string, roomId: string) => dbStorage.joinRoom(userId, roomId),
+  getRoomMembers: (roomId: string) => dbStorage.getRoomMembers(roomId),
+  getPosts: () => dbStorage.getPosts(),
+  getPostsByUser: (userId: string) => dbStorage.getPostsByUser(userId),
+  createPost: (post: InsertPost) => dbStorage.createPost(post),
+  likePost: (userId: string, postId: string) => dbStorage.likePost(userId, postId),
+  unlikePost: (userId: string, postId: string) => dbStorage.unlikePost(userId, postId),
+  getPostComments: (postId: string) => dbStorage.getPostComments(postId),
+  addComment: (comment: InsertPostComment) => dbStorage.addComment(comment),
+  sharePost: (userId: string, postId: string) => dbStorage.sharePost(userId, postId),
 };
